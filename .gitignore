@@ -1,0 +1,22 @@
+# Données (volumineuses / sous licence — ne pas committer)
+data/*.csv
+!data/README.md
+
+# Sorties générées
+outputs/*
+!outputs/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS / éditeurs
+.DS_Store
+.vscode/
+.idea/
