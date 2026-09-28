@@ -39,6 +39,7 @@ import io
 import json
 import logging
 import os
+from dotenv import load_dotenv
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -64,6 +65,97 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 
 
+# ==============================================================================
+# CONFIGURATION
+# ==============================================================================
+
+# BASE_DIR = Path(__file__).resolve().parent
+ROOT_DIR = Path(__file__).resolve().parents[2]
+load_dotenv(ROOT_DIR / ".env")
+
+MODEL_BACKEND = os.getenv("MODEL_BACKEND", "pkl")
+# MODEL_PATH = os.getenv("MODEL_PATH")
+
+MODEL_PATH = Path(
+    os.getenv(
+        str("MODEL_PATH"),
+        str(ROOT_DIR / "models" / "employment_risk_model.pkl"),
+    )
+)
+
+RETRAIN_OUTPUT_DIR = Path(
+    os.getenv(
+        "RETRAIN_OUTPUT_DIR",
+        "/app/api/models",
+    )
+)
+
+TARGET_COLUMN = os.getenv(
+    "TARGET_COLUMN",
+    "classe_retour_emploi",
+)
+
+MLFLOW_TRACKING_URI = os.getenv(
+    "MLFLOW_TRACKING_URI",
+    "http://host.docker.internal:5000",
+)
+
+MLFLOW_EXPERIMENT_NAME = os.getenv(
+    "MLFLOW_EXPERIMENT_NAME",
+    "Employment_Prediction",
+)
+
+MODEL_NAME = os.getenv(
+    "MODEL_NAME",
+    "employment_class_model",
+)
+
+MODEL_ALIAS = os.getenv(
+    "MODEL_ALIAS",
+    "champion",
+)
+
+# Garde-fous de promotion.
+# Ces valeurs sont des paramètres opérationnels, à justifier dans le rapport.
+MAX_F1_MACRO_DROP = float(
+    os.getenv("MAX_F1_MACRO_DROP", "0.01")
+)
+
+MIN_CLASS_2_RECALL = float(
+    os.getenv("MIN_CLASS_2_RECALL", "0.50")
+)
+
+MAX_CRITICAL_ERRORS = int(
+    os.getenv("MAX_CRITICAL_ERRORS", "5")
+)
+
+MIN_RETRAINING_ROWS = int(
+    os.getenv("MIN_RETRAINING_ROWS", "30")
+)
+
+VALIDATION_SIZE = float(
+    os.getenv("RETRAIN_VALIDATION_SIZE", "0.20")
+)
+
+RANDOM_STATE = int(
+    os.getenv("RANDOM_STATE", "42")
+)
+
+ALLOWED_CLASSES = {0, 1, 2}
+
+# Un seul réentraînement à la fois dans ce processus.
+retraining_lock = threading.Lock()
+
+# Protège le remplacement du modèle actif.
+model_lock = threading.RLock()
+
+
+print(f"✅ Root : {ROOT_DIR}")
+print(f"✅ Back-end : {MODEL_BACKEND}")
+print(f"✅ Model Path : {MODEL_PATH}")
+# print(f"✅ Root : {ROOT_DIR}")
+# print(f"✅ Root : {ROOT_DIR}")
+# print(f"✅ Root : {ROOT_DIR}")
 
 # ==============================================================================
 # JOURNALISATION
@@ -118,95 +210,6 @@ logger.addHandler(file_handler)
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(JsonFormatter())
 logger.addHandler(console_handler)
-
-
-
-
-
-
-# ==============================================================================
-# CONFIGURATION
-# ==============================================================================
-
-
-BASE_DIR = Path(__file__).resolve().parent
-
-
-MODEL_BACKEND = os.getenv("MODEL_BACKEND", "pkl")
-
-MODEL_PATH = Path(
-    os.getenv(
-        "MODEL_PATH",
-        str(BASE_DIR / "models" / "employment_risk_model.pkl"),
-    )
-)
-
-
-RETRAIN_OUTPUT_DIR = Path(
-    os.getenv(
-        "RETRAIN_OUTPUT_DIR",
-        "/app/api/models",
-    )
-)
-
-TARGET_COLUMN = os.getenv(
-    "TARGET_COLUMN",
-    "classe_retour_emploi",
-)
-
-MLFLOW_TRACKING_URI = os.getenv(
-    "MLFLOW_TRACKING_URI",
-    "http://host.docker.internal:5000",
-)
-
-MLFLOW_EXPERIMENT_NAME = os.getenv(
-    "MLFLOW_EXPERIMENT_NAME",
-    "employment_model_retraining",
-)
-
-MODEL_NAME = os.getenv(
-    "MODEL_NAME",
-    "employment_class_model",
-)
-
-MODEL_ALIAS = os.getenv(
-    "MODEL_ALIAS",
-    "champion",
-)
-
-# Garde-fous de promotion.
-# Ces valeurs sont des paramètres opérationnels, à justifier dans le rapport.
-MAX_F1_MACRO_DROP = float(
-    os.getenv("MAX_F1_MACRO_DROP", "0.01")
-)
-
-MIN_CLASS_2_RECALL = float(
-    os.getenv("MIN_CLASS_2_RECALL", "0.50")
-)
-
-MAX_CRITICAL_ERRORS = int(
-    os.getenv("MAX_CRITICAL_ERRORS", "5")
-)
-
-MIN_RETRAINING_ROWS = int(
-    os.getenv("MIN_RETRAINING_ROWS", "30")
-)
-
-VALIDATION_SIZE = float(
-    os.getenv("RETRAIN_VALIDATION_SIZE", "0.20")
-)
-
-RANDOM_STATE = int(
-    os.getenv("RANDOM_STATE", "42")
-)
-
-ALLOWED_CLASSES = {0, 1, 2}
-
-# Un seul réentraînement à la fois dans ce processus.
-retraining_lock = threading.Lock()
-
-# Protège le remplacement du modèle actif.
-model_lock = threading.RLock()
 
 
 # ==============================================================================
@@ -369,7 +372,7 @@ def load_model() -> None:
 load_model()
 
 # ==============================================================================
-# CHARGEMENT DES DONNEES
+# CHARGEMENT DES DONNEES POUR LA PREDICTION
 # ==============================================================================
 
 def build_model_input(data, features):
@@ -423,8 +426,7 @@ def audit_prediction(
         }
     )
 
-
-    
+ 
 def get_model_features(dataframe: pd.DataFrame) -> list[str]:
     """
     Détermine les colonnes utilisées pour l'entraînement.
@@ -433,39 +435,80 @@ def get_model_features(dataframe: pd.DataFrame) -> list[str]:
     Sinon, toutes les colonnes sauf la cible sont utilisées.
     """
 
-    if features:
-        return list(features)
+    if not features:
+        return [
+            col
+            for col in dataframe.columns
+            if col != TARGET_COLUMN
+        ]
 
-    return [
-        column
-        for column in dataframe.columns
-        if column != TARGET_COLUMN
+    expected_features = [
+        *features.get("num_features", []),
+        *features.get("cat_features", []),
     ]
 
+    txt_feature = features.get("txt_features")
 
-def validate_retraining_dataframe(
-    dataframe: pd.DataFrame,
-) -> list[str]:
-    """
-    Valide le dataset de feedback avant réentraînement.
+    if isinstance(txt_feature, str):
+        expected_features.append(txt_feature)
+    elif isinstance(txt_feature, list):
+        expected_features.extend(txt_feature)
 
-    Returns
-    -------
-    list[str]
-        Liste ordonnée des features attendues.
-    """
+    return list(dict.fromkeys(expected_features))
+
+
+def validate_retraining_dataframe(dataframe: pd.DataFrame) -> list[str]:
+    """Valide et prépare le dataset brut avant réentraînement."""
+    feat_num = ["age", "anciennete_poste_ans"]
+    feat_cat = [
+        "niveau_diplome",
+        "code_rome_vise",
+        "departement",
+        "est_allocataire",
+        "nationalite_hors_ue",
+    ]
+    feat_txt = "synthese_entretien"
+    target = "classe_retour_emploi"
+    feat_sen = ["age", "nationalite_hors_ue"]
+
+    required_input_columns = [
+        "usager_id",
+        "age",
+        "niveau_diplome",
+        "anciennete_poste_ans",
+        "code_rome_vise",
+        "code_insee_commune",
+        "est_allocataire",
+        "nationalite_hors_ue",
+        "synthese_entretien",
+        target,
+    ]
+    model_features = feat_num + feat_cat + [feat_txt]
 
     if dataframe.empty:
+        raise HTTPException(status_code=422, detail="Le fichier CSV est vide.")
+
+    missing_columns = [
+        column
+        for column in required_input_columns
+        if column not in dataframe.columns
+    ]
+    if missing_columns:
         raise HTTPException(
             status_code=422,
-            detail="Le fichier CSV est vide.",
+            detail={
+                "message": "Des variables obligatoires sont absentes.",
+                "missing_features": missing_columns,
+                "required_features": required_input_columns,
+            },
         )
 
-    if TARGET_COLUMN not in dataframe.columns:
+    if TARGET_COLUMN != target:
         raise HTTPException(
-            status_code=422,
+            status_code=500,
             detail=(
-                f"La colonne cible '{TARGET_COLUMN}' est absente."
+                "Configuration incohérente : TARGET_COLUMN doit valoir "
+                f"'{target}', valeur reçue : '{TARGET_COLUMN}'."
             ),
         )
 
@@ -479,30 +522,62 @@ def validate_retraining_dataframe(
             ),
         )
 
-    if dataframe[TARGET_COLUMN].isna().any():
+    # Préserve ou restaure les zéros initiaux supprimés par l'inférence CSV.
+    insee_codes = (
+        dataframe["code_insee_commune"]
+        .astype("string")
+        .str.strip()
+        .str.upper()
+        .str.replace(r"\.0$", "", regex=True)
+        .str.zfill(5)
+    )
+    valid_insee_mask = insee_codes.str.fullmatch(
+        r"(?:\d{5}|2[AB]\d{3})",
+        na=False,
+    )
+    if not valid_insee_mask.all():
+        invalid_rows = dataframe.index[~valid_insee_mask].tolist()[:10]
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": (
+                    "La colonne 'code_insee_commune' contient des codes "
+                    "invalides. Chaque code doit avoir cinq caractères."
+                ),
+                "invalid_row_indices": invalid_rows,
+            },
+        )
+
+    dataframe["code_insee_commune"] = insee_codes
+    dataframe["departement"] = np.where(
+        insee_codes.str.startswith(("97", "98")),
+        insee_codes.str[:3],
+        insee_codes.str[:2],
+    )
+
+    if dataframe[target].isna().any():
         raise HTTPException(
             status_code=422,
             detail="La cible contient des valeurs manquantes.",
         )
 
     try:
-        dataframe[TARGET_COLUMN] = dataframe[
-            TARGET_COLUMN
-        ].astype(int)
+        numeric_target = pd.to_numeric(dataframe[target], errors="raise")
     except (TypeError, ValueError) as exc:
         raise HTTPException(
             status_code=422,
-            detail=(
-                "La colonne cible doit contenir des entiers 0, 1 ou 2."
-            ),
+            detail="La colonne cible doit contenir des entiers 0, 1 ou 2.",
         ) from exc
 
-    received_classes = set(
-        dataframe[TARGET_COLUMN].unique().tolist()
-    )
+    if not np.equal(numeric_target, numeric_target.astype(int)).all():
+        raise HTTPException(
+            status_code=422,
+            detail="La colonne cible doit contenir des entiers 0, 1 ou 2.",
+        )
+    dataframe[target] = numeric_target.astype(int)
 
+    received_classes = set(dataframe[target].unique().tolist())
     invalid_classes = received_classes - ALLOWED_CLASSES
-
     if invalid_classes:
         raise HTTPException(
             status_code=422,
@@ -513,8 +588,7 @@ def validate_retraining_dataframe(
             ),
         )
 
-    class_counts = dataframe[TARGET_COLUMN].value_counts()
-
+    class_counts = dataframe[target].value_counts()
     if len(class_counts) < 2:
         raise HTTPException(
             status_code=422,
@@ -523,7 +597,6 @@ def validate_retraining_dataframe(
                 "pour permettre une évaluation."
             ),
         )
-
     if class_counts.min() < 2:
         raise HTTPException(
             status_code=422,
@@ -533,30 +606,19 @@ def validate_retraining_dataframe(
             ),
         )
 
-    expected_features = get_model_features(dataframe)
-
-    missing_features = sorted(
-        set(expected_features) - set(dataframe.columns)
+    logger.info(
+        "Retraining dataframe validated",
+        extra={
+            "extra_data": {
+                "row_count": len(dataframe),
+                "model_features": model_features,
+                "sensitive_features": feat_sen,
+                "target": target,
+            }
+        },
     )
+    return model_features
 
-    if missing_features:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "message": "Des variables attendues sont absentes.",
-                "missing_features": missing_features,
-            },
-        )
-
-    # L'identifiant ne doit pas devenir accidentellement une variable
-    # prédictive si le pipeline initial ne l'utilisait pas.
-    if "usager_id" in expected_features:
-        logger.warning(
-            "usager_id figure parmi les features du modèle. "
-            "Vérifier le risque de mémorisation et de fuite de données."
-        )
-
-    return expected_features
 
 
 def compute_metrics(
@@ -746,110 +808,6 @@ def promote_local_model(
     temporary_active_path.replace(MODEL_PATH)
 
 
-def log_retraining_to_mlflow(
-    candidate_model: Any,
-    X_train: pd.DataFrame,
-    metrics: dict[str, Any],
-    retraining_id: str,
-    promote: bool,
-) -> tuple[str | None, str | None]:
-    """
-    Journalise le run et enregistre le modèle candidat dans MLflow.
-
-    Returns
-    -------
-    tuple[str | None, str | None]
-        Run ID MLflow et version du modèle enregistré.
-    """
-
-    if MODEL_BACKEND == "pkl":
-        return None, None
-
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
-
-    with mlflow.start_run(
-        run_name=f"retraining-{retraining_id}"
-    ) as run:
-        mlflow.set_tags(
-            {
-                "retraining_id": retraining_id,
-                "feedback_source": "conseiller_validated",
-                "promotion_decision": str(promote).lower(),
-                "human_supervision": "required",
-            }
-        )
-
-        mlflow.log_params(
-            {
-                "row_count": len(X_train),
-                "validation_size": VALIDATION_SIZE,
-                "random_state": RANDOM_STATE,
-                "max_f1_macro_drop": MAX_F1_MACRO_DROP,
-                "min_class_2_recall": MIN_CLASS_2_RECALL,
-                "max_critical_errors": MAX_CRITICAL_ERRORS,
-            }
-        )
-
-        scalar_metrics = {
-            key: value
-            for key, value in metrics.items()
-            if isinstance(value, (int, float))
-            and value is not None
-        }
-        mlflow.log_metrics(scalar_metrics)
-
-        confusion_matrix_path = (
-            RETRAIN_OUTPUT_DIR
-            / f"confusion_matrix_{retraining_id}.json"
-        )
-        confusion_matrix_path.parent.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-        confusion_matrix_path.write_text(
-            json.dumps(
-                metrics["confusion_matrix"],
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-        mlflow.log_artifact(str(confusion_matrix_path))
-
-        input_example = X_train.head(3)
-        signature = infer_signature(
-            X_train,
-            candidate_model.predict(X_train),
-        )
-
-        model_info = mlflow.sklearn.log_model(
-            sk_model=candidate_model,
-            name="model",
-            registered_model_name=MODEL_NAME,
-            signature=signature,
-            input_example=input_example,
-        )
-
-        model_version = getattr(
-            model_info,
-            "registered_model_version",
-            None,
-        )
-
-        if promote and model_version is not None:
-            mlflow_client = MlflowClient()
-            mlflow_client.set_registered_model_alias(
-                MODEL_NAME,
-                MODEL_ALIAS,
-                str(model_version),
-            )
-
-        return run.info.run_id, (
-            str(model_version)
-            if model_version is not None
-            else None
-        )
-
 
 # ==============================================================================
 # ENDPOINT RACINE
@@ -961,7 +919,6 @@ def predict(data: UserData) -> dict[str, Any]:
     input_df = build_model_input(data,features)
 
     print(input_df)
-    print(input_df.isna().sum())
     print(type(model))
 
     try:
@@ -1063,13 +1020,27 @@ async def retrain(
 
     retraining_id = str(uuid4())
 
+    if model is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Le modèle actif n'est pas chargé.",
+        )
+
     if not retraining_lock.acquire(blocking=False):
         raise HTTPException(
             status_code=409,
             detail="Un réentraînement est déjà en cours.",
         )
 
+    run_id: str | None = None
+    model_version: str | None = None
+    candidate_path: Path | None = None
+
     try:
+        # ----------------------------------------------------------
+        # 1. Validation du fichier chargé
+        # ----------------------------------------------------------
+
         if not feedback_file.filename:
             raise HTTPException(
                 status_code=422,
@@ -1092,7 +1063,7 @@ async def retrain(
 
         try:
             dataframe = pd.read_csv(
-                io.BytesIO(raw_content)
+                io.BytesIO(raw_content),
             )
         except Exception as exc:
             raise HTTPException(
@@ -1100,77 +1071,371 @@ async def retrain(
                 detail="Le fichier CSV est illisible.",
             ) from exc
 
+        logger.info(
+            "retraining_file_loaded",
+            extra={
+                "extra_data": {
+                    "retraining_id": retraining_id,
+                    "filename": feedback_file.filename,
+                    "row_count": len(dataframe),
+                    "column_count": len(dataframe.columns),
+                }
+            },
+        )
+
+        print(
+            f"✅ Données chargées : "
+            f"{len(dataframe)} lignes, "
+            f"{len(dataframe.columns)} colonnes"
+        )
+        
         # ----------------------------------------------------------
-        # validation des features
+        # 2. Validation et préparation des variables
         # ----------------------------------------------------------
-        expected_features = validate_retraining_dataframe(dataframe)
+
+        expected_features = validate_retraining_dataframe(
+            dataframe
+        )
 
         X = dataframe[expected_features].copy()
         y = dataframe[TARGET_COLUMN].copy()
 
+        print(
+            f"✅ Dataset modèle préparé : "
+            f"{X.shape[0]} lignes, "
+            f"{X.shape[1]} features"
+        )
+        print(f"✅ Features utilisées : {expected_features}")
+        print(
+            f"✅ Répartition globale des classes : "
+            f"{y.value_counts().sort_index().to_dict()}"
+        )
+
+        logger.info(
+            "retraining_dataframe_validated",
+            extra={
+                "extra_data": {
+                    "retraining_id": retraining_id,
+                    "row_count": len(X),
+                    "feature_count": X.shape[1],
+                    "features": expected_features,
+                    "class_distribution": (
+                        y.value_counts()
+                        .sort_index()
+                        .to_dict()
+                    ),
+                }
+            },
+        )
+
         # ----------------------------------------------------------
-        # Découpage stratifié du nouveau jeu de données
+        # 3. Découpage train/validation stratifié
         # ----------------------------------------------------------
         try:
-            X_train, X_validation, y_train, y_validation = (
-                train_test_split(
-                    X,
-                    y,
-                    test_size=VALIDATION_SIZE,
-                    random_state=RANDOM_STATE,
-                    stratify=y,
-                )
+            (
+                X_train,
+                X_validation,
+                y_train,
+                y_validation,
+            ) = train_test_split(
+                X,
+                y,
+                test_size=VALIDATION_SIZE,
+                random_state=RANDOM_STATE,
+                stratify=y,
             )
         except ValueError as exc:
             raise HTTPException(
                 status_code=422,
                 detail=(
                     "Le découpage stratifié est impossible. "
-                    "Vérifier le nombre d'observations par classe."
+                    "Vérifier le nombre d'observations par classe "
+                    "et la taille du jeu de validation."
                 ),
             ) from exc
 
+        print(
+            f"✅ Split effectué : "
+            f"total={len(X)} | "
+            f"train={len(X_train)} "
+            f"({len(X_train) / len(X):.1%}) | "
+            f"validation={len(X_validation)} "
+            f"({len(X_validation) / len(X):.1%})"
+        )
+
+        print(
+            f"✅ Classes train : "
+            f"{y_train.value_counts().sort_index().to_dict()}"
+        )
+        print(
+            f"✅ Classes validation : "
+            f"{y_validation.value_counts().sort_index().to_dict()}"
+        )
+
+        logger.info(
+            "retraining_split_completed",
+            extra={
+                "extra_data": {
+                    "retraining_id": retraining_id,
+                    "train_row_count": len(X_train),
+                    "validation_row_count": len(X_validation),
+                    "validation_size": VALIDATION_SIZE,
+                    "random_state": RANDOM_STATE,
+                    "train_class_distribution": (
+                        y_train.value_counts()
+                        .sort_index()
+                        .to_dict()
+                    ),
+                    "validation_class_distribution": (
+                        y_validation.value_counts()
+                        .sort_index()
+                        .to_dict()
+                    ),
+                }
+            },
+        )
+
+        
         # ----------------------------------------------------------
-        # Baseline = performance du champion actuel
+        # 4. Évaluation du modèle champion
         # ----------------------------------------------------------
-        with model_lock:
-            baseline_predictions = model.predict(
-                X_validation
-            )
+        try:
+            with model_lock:
+                baseline_predictions = model.predict(
+                    X_validation
+                )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Le modèle actif n'a pas pu être évalué "
+                    "sur le jeu de validation."
+                ),
+            ) from exc
 
         baseline_metrics = compute_metrics(
             y_validation,
             baseline_predictions,
         )
 
+        print("========================================")
+        print("📊 Évaluation du modèle champion")
+        print(f"Accuracy          : {baseline_metrics['accuracy']}")
+        print(f"F1 macro          : {baseline_metrics['f1_macro']}")
+        print(
+            "Recall classe 2   : "
+            f"{baseline_metrics['recall_class_2']}"
+        )
+        print(
+            "Erreurs critiques : "
+            f"{baseline_metrics['critical_errors_2_to_0']}"
+        )
+        print(
+            "Taux critique     : "
+            f"{baseline_metrics['critical_error_rate_2_to_0']}"
+        )
+        print(
+            "Matrice confusion : "
+            f"{baseline_metrics['confusion_matrix']}"
+        )
+        print("========================================")
+        
+
         # ----------------------------------------------------------
-        # Entrainement du modèle candidat
+        # 5. Initialisation du tracking MLflow
         # ----------------------------------------------------------
-        try:
-            candidate_model = clone(model)
-        except Exception as exc:
-            raise HTTPException(
-                status_code=500,
-                detail=(
-                    "Le modèle actif ne peut pas être cloné. "
-                    "Enregistrer le pipeline sklearn complet "
-                    "dans l'artefact."
-                ),
-            ) from exc
+        if 1 == 1:
+            mlflow.set_tracking_uri(
+                MLFLOW_TRACKING_URI
+            )
+            mlflow.set_experiment(
+                MLFLOW_EXPERIMENT_NAME
+            )
 
-        candidate_model.fit(
-            X_train,
-            y_train,
-        )
+            run_context = mlflow.start_run(
+                run_name=f"retraining-{retraining_id}"
+            )
+        else:
+            # Aucun run distant pour le backend PKL.
+            run_context = nullcontext(None)
 
-        candidate_predictions = candidate_model.predict(
-            X_validation
-        )
+        # Le run est ouvert avant clone(), fit() et predict().
+        with run_context as active_run:
+            if active_run is not None:
+                run_id = active_run.info.run_id
 
-        candidate_metrics = compute_metrics(
-            y_validation,
-            candidate_predictions,
-        )
+                mlflow.set_tags(
+                    {
+                        "retraining_id": retraining_id,
+                        "feedback_source": "conseiller_validated",
+                        "human_supervision": "required",
+                        "model_role": "candidate",
+                        "active_model_version": (
+                            active_model_version or "unknown"
+                        ),
+                        "promotion_requested": str(
+                            promote_if_valid
+                        ).lower(),
+                        "status": "training",
+                    }
+                )
+
+                mlflow.log_params(
+                    {
+                        "input_row_count": len(dataframe),
+                        "feature_count": len(expected_features),
+                        "train_row_count": len(X_train),
+                        "validation_row_count": len(X_validation),
+                        "validation_size": VALIDATION_SIZE,
+                        "random_state": RANDOM_STATE,
+                        "target_column": TARGET_COLUMN,
+                        "max_f1_macro_drop": MAX_F1_MACRO_DROP,
+                        "min_class_2_recall": MIN_CLASS_2_RECALL,
+                        "max_critical_errors": MAX_CRITICAL_ERRORS,
+                        "source_filename": (
+                            feedback_file.filename or "unknown"
+                        ),
+                    }
+                )
+
+                mlflow.log_dict(
+                    {
+                        "features": expected_features,
+                        "target": TARGET_COLUMN,
+                    },
+                    "dataset/feature_configuration.json",
+                )
+
+                mlflow.log_dict(
+                    {
+                        "global": (
+                            y.value_counts()
+                            .sort_index()
+                            .to_dict()
+                        ),
+                        "train": (
+                            y_train.value_counts()
+                            .sort_index()
+                            .to_dict()
+                        ),
+                        "validation": (
+                            y_validation.value_counts()
+                            .sort_index()
+                            .to_dict()
+                        ),
+                    },
+                    "dataset/class_distributions.json",
+                )
+
+                baseline_scalar_metrics = {
+                    f"baseline_{key}": value
+                    for key, value in baseline_metrics.items()
+                    if isinstance(value, (int, float))
+                    and value is not None
+                }
+
+                mlflow.log_metrics(
+                    baseline_scalar_metrics
+                )
+
+                mlflow.log_dict(
+                    {
+                        "labels": [0, 1, 2],
+                        "matrix": baseline_metrics[
+                            "confusion_matrix"
+                        ],
+                    },
+                    "metrics/baseline_confusion_matrix.json",
+                )
+
+        
+            # ----------------------------------------------------------
+            # 6. Clonage et entraînement du candidat
+            # ----------------------------------------------------------
+            try:
+                with model_lock:
+                    candidate_model = clone(model)
+            except Exception as exc:
+                if active_run is not None:
+                    mlflow.set_tag("status", "clone_failed")
+
+                raise HTTPException(
+                    status_code=500,
+                    detail=(
+                        "Le modèle actif ne peut pas être cloné. "
+                        "L'artefact doit contenir un estimateur ou "
+                        "un pipeline Scikit-learn clonable."
+                    ),
+                ) from exc
+
+            try:
+                candidate_model.fit(
+                    X_train,
+                    y_train,
+                )
+            except Exception as exc:
+                if active_run is not None:
+                    mlflow.set_tag("status", "training_failed")
+
+                raise HTTPException(
+                    status_code=500,
+                    detail=(
+                        "L'entraînement du modèle candidat "
+                        "a échoué."
+                    ),
+                ) from exc
+
+            # ----------------------------------------------------------
+            # 7. Évaluation du candidat
+            # ----------------------------------------------------------
+            try:
+                candidate_predictions = candidate_model.predict(
+                    X_validation
+                )
+            except Exception as exc:
+                if active_run is not None:
+                    mlflow.set_tag("status", "evaluation_failed")
+
+                raise HTTPException(
+                    status_code=500,
+                    detail=(
+                        "Le modèle candidat n'a pas pu être évalué."
+                    ),
+                ) from exc
+
+            candidate_metrics = compute_metrics(
+                y_validation,
+                candidate_predictions,
+            )
+
+            print("========================================")
+            print("📊 Évaluation du modèle candidat")
+            print(
+                f"Accuracy          : "
+                f"{candidate_metrics['accuracy']}"
+            )
+            print(
+                f"F1 macro          : "
+                f"{candidate_metrics['f1_macro']}"
+            )
+            print(
+                f"Recall classe 2   : "
+                f"{candidate_metrics['recall_class_2']}"
+            )
+            print(
+                f"Erreurs critiques : "
+                f"{candidate_metrics['critical_errors_2_to_0']}"
+            )
+            print(
+                f"Taux critique     : "
+                f"{candidate_metrics['critical_error_rate_2_to_0']}"
+            )
+            print(
+                f"Matrice confusion : "
+                f"{candidate_metrics['confusion_matrix']}"
+            )
+            print("========================================")
+        
 
         # ----------------------------------------------------------
         # Vérification des garde-fous (comparaison champion vs. candidat)
@@ -1180,53 +1445,40 @@ async def retrain(
             candidate_metrics,
         )
 
+        print(f"✅ Evalution promotion : gate passed ? {gates_passed}")
 
-        # ----------------------------------------------------------
-        # Enregistrement du candidat dans MLflow
-        # ----------------------------------------------------------
-        run_id, model_version = (
-            log_retraining_to_mlflow(
-                candidate_model=candidate_model,
-                X_train=X_train,
-                metrics=candidate_metrics,
-                retraining_id=retraining_id,
-                promote=False
-            )
-        )
-
-        promoted = False
-
+        print(f"promote_if_valid = {promote_if_valid}")
+        print(f"gates_passed = {gates_passed}")
+        print(f"model_version = {model_version}")
+        
         # ----------------------------------------------------------
         # Promotion éventuelle
         # ----------------------------------------------------------
-        if (
-            promote_if_valid
-            and gates_passed
-            and model_version is not None
-        ):
+        promoted = False
 
-            mlflow_client = MlflowClient()
+        try:
+            if (
+                promote_if_valid
+                and gates_passed
+                and model_version is not None
+            ):
+                mlflow_client = MlflowClient()
 
-            mlflow_client.set_registered_model_alias(
-                MODEL_NAME,
-                MODEL_ALIAS,
-                str(model_version)
+                mlflow_client.set_registered_model_alias(
+                    MODEL_NAME,
+                    MODEL_ALIAS,
+                    str(model_version)
+                )
+
+                load_model()
+
+                promoted = True
+
+        except Exception as exc:
+            logger.exception(
+                "Échec de la promotion MLflow : %s",
+                exc
             )
-
-            promoted = True
-
-            logger.info(
-                (
-                    "Promotion du modèle %s "
-                    "vers alias %s"
-                ),
-                model_version,
-                MODEL_ALIAS
-            )
-
-            # recharge automatiquement
-            load_model()        
-
 
         # ----------------------------------------------------------
         # Statut final
@@ -1287,5 +1539,4 @@ async def retrain(
 
     finally:
         retraining_lock.release()
-
 
