@@ -23,3 +23,5 @@ env/
 
 # MLFlow
 app/mlflow/
+
+.env
