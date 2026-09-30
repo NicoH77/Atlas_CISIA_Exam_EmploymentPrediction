@@ -1,0 +1,8 @@
+.venv
+.git
+.gitignore
+mlruns
+__pycache__
+*.pyc
+.ipynb_checkpoints
+notebooks
