@@ -62,7 +62,7 @@ from mlflow.models import infer_signature
 # ------------------------------------------------------------------
 
 
-def train_model(model, preprocessor, X_train, X_test, y_train, y_test, model_name="retour-emploi-multimodal", stage="Staging"):
+def train_model(model, preprocessor, X_train, X_test, y_train, y_test, model_name="employment_risk_model", alias="candidate"):
     """
     Entraîne le GridSearchCV et log les résultats dans MLflow.
     
@@ -177,26 +177,28 @@ def train_model(model, preprocessor, X_train, X_test, y_train, y_test, model_nam
 
         
         # ====================================================================
-        # ÉTAPE 5 : MATRICE DE CONFUSION
+        # ÉTAPE 5 : MATRICE DE CONFUSION NORMALISÉE
         # ====================================================================
-        # Capture et log de la matrice de confusion
 
-        # Matrice de confusion
-        cm = confusion_matrix(y_test, y_pred)
+        fig, ax = plt.subplots(figsize=(6, 5))
 
-        # Plot
-        fig, ax = plt.subplots(figsize=(5, 5))
-
-        disp = ConfusionMatrixDisplay(
-            confusion_matrix=cm
+        disp = ConfusionMatrixDisplay.from_predictions(
+            y_test,
+            y_pred,
+            normalize="true",  # normalisation par ligne
+            cmap="Blues",
+            values_format=".2f",
+            ax=ax
         )
 
-        disp.plot(ax=ax)
+        ax.set_title("Matrice de confusion normalisée")
 
-        # Log de la matrice dans MLFLow
-        mlflow.log_figure(fig, "confusion_matrix.png")
+        mlflow.log_figure(
+            fig,
+            "confusion_matrix_normalized.png"
+        )
 
-        plt.close()        
+        plt.close(fig)      
 
         # =====================================================
         # ÉTAPE 6 : TAGS
@@ -207,7 +209,7 @@ def train_model(model, preprocessor, X_train, X_test, y_train, y_test, model_nam
                 "project": "CISIA",
                 "scenario": scenario,
                 "task": "multiclass_classification",
-                "author": "Nico-H",
+                "author": "Nico-H"
             }
         )
         
@@ -217,11 +219,11 @@ def train_model(model, preprocessor, X_train, X_test, y_train, y_test, model_nam
 
         model_info = mlflow.sklearn.log_model(
             sk_model=pipeline,
-            artifact_path="model",
+            name="model",
             serialization_format="pickle"
         )
 
-
+        
         # ====================================================================
         # ÉTAPE 8 : AFFICHAGE DES RÉSULTATS
         # ====================================================================
@@ -240,15 +242,83 @@ def train_model(model, preprocessor, X_train, X_test, y_train, y_test, model_nam
 
         model_version = mlflow.register_model(model_info.model_uri, model_name)
 
-        client.transition_model_version_stage(
+        # Attente création version
+        client.set_registered_model_alias(
             name=model_name,
-            version=model_version.version,
-            stage=stage
+            alias=alias,
+            version=model_version.version
         )
+
+        
 
         print("Run ID :", mlflow.active_run().info.run_id)
         print("Model version :", model_version.version)
         print("F1-Macro :", round(metriques['f1_macro'], 4))
 
         return pipeline
+
+
+
+from mlflow import MlflowClient
+
+
+
+def promote_version_to_champion(
+    model_name: str,
+    version: int | None = None
+) -> int:
+    """
+    Promeut une version en champion.
+
+    Si version est None, la version actuellement
+    marquée comme 'candidate' est promue.
+
+    Parameters
+    ----------
+    model_name : str
+        Nom du modèle dans le registry.
+
+    version : int | None
+        Version à promouvoir.
+        Si None, promotion du candidate courant.
+
+    Returns
+    -------
+    int
+        Version promue.
+    """
+
+    client = MlflowClient()
+
+    # Cas 1 : aucune version fournie
+    if version is None:
+
+        candidate = client.get_model_version_by_alias(
+            name=model_name,
+            alias="candidate"
+        )
+
+        version = int(candidate.version)
+
+    # Promotion
+    client.set_registered_model_alias(
+        name=model_name,
+        alias="champion",
+        version=version
+    )
+
+    client.set_model_version_tag(
+        name=model_name,
+        version=version,
+        key="status",
+        value="champion"
+    )
+
+    print(
+        f"✅ Version {version} promue CHAMPION"
+    )
+
+    return version
+
+
 
