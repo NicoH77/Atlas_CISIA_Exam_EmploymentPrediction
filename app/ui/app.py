@@ -5,17 +5,27 @@ import pandas as pd
 import requests
 import streamlit as st
 from dotenv import load_dotenv
+import os
 
 # =====================================================
 # CONFIGURATION
 # =====================================================
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(ROOT_DIR / ".env")
+load_dotenv()
 
-DB_PATH = ROOT_DIR / "app" / "ui" / "database" / "history.db"
+ROOT_DIR = Path(__file__).resolve().parent
 
-API_URL = "http://localhost:8000/predict"
+DB_PATH = Path(
+    os.getenv(
+        "DB_PATH",
+        "/app/database/history.db"
+    )
+)
+
+API_URL = os.getenv(
+    "API_URL",
+    "http://api:8000/predict"
+)
 
 
 st.set_page_config(
@@ -123,6 +133,31 @@ st.markdown(
     pour les conseillers de l'agence.
     """
 )
+
+# =====================================================
+# SIDE BAR
+# =====================================================
+
+try:
+    model_info = requests.get(
+        "http://api:8000/model-info",
+        timeout=5
+    ).json()
+
+    st.sidebar.title("🤖 Modèle déployé")
+    st.sidebar.write(
+        f"**Nom :** {model_info['model_name']}"
+    )
+    st.sidebar.write(
+        f"**Version :** {model_info['version']}"
+    )
+
+except Exception:
+    st.sidebar.warning(
+        "Informations modèle indisponibles"
+    )
+
+
 
 # =====================================================
 # ONGLETS
