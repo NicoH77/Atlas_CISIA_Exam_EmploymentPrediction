@@ -1,0 +1,233 @@
+name: CISIA CI/CD Pipeline
+
+###############################################################################
+# Déclencheurs
+###############################################################################
+
+on:
+
+  # Exécution automatique à chaque push sur la branche principale
+  push:
+    branches:
+      - main
+
+  # Vérification avant fusion
+  # pull_request:
+  #   branches:
+  #     - main
+
+  # Permet un lancement manuel depuis GitHub
+  workflow_dispatch:
+
+###############################################################################
+# Permissions nécessaires pour pousser dans GitHub Container Registry
+###############################################################################
+
+permissions:
+  contents: read
+  packages: write
+
+###############################################################################
+# Variables globales
+###############################################################################
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_API: employment-api
+  IMAGE_UI: employment-ui
+
+###############################################################################
+# JOB 1 : Tests et vérifications
+###############################################################################
+
+jobs:
+
+  test:
+
+    name: Tests et validation
+    runs-on: ubuntu-latest
+
+    steps:
+
+      #########################################################################
+      # Récupération du dépôt
+      #########################################################################
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      #########################################################################
+      # Installation Python
+      #########################################################################
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      #########################################################################
+      # Cache pip pour accélérer les builds
+      #########################################################################
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}
+
+      #########################################################################
+      # Installation des dépendances du projet ML
+      #########################################################################
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      #########################################################################
+      # Ruff (si installé)
+      #########################################################################
+
+      - name: Lint code
+        run: |
+          pip install ruff
+          ruff check .
+        continue-on-error: true
+
+      #########################################################################
+      # Vérification du modèle entraîné
+      #########################################################################
+
+      - name: Verify trained model exists
+        run: |
+          test -f outputs/employment_risk_model.pkl
+
+      #########################################################################
+      # Vérification du dataset
+      #########################################################################
+
+      - name: Verify datasets exist
+        run: |
+          test -f data/dataset_trajectoire_emploi.csv
+
+      #########################################################################
+      # Lancement des tests unitaires
+      #########################################################################
+
+      - name: Run tests
+        run: |
+          pytest tests/ -v
+
+###############################################################################
+# JOB 2 : Construction des images Docker
+###############################################################################
+
+  docker:
+
+    name: Docker Build & Push
+
+    runs-on: ubuntu-latest
+
+    needs:
+      - test
+
+    steps:
+
+      #########################################################################
+      # Récupération du code
+      #########################################################################
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      #########################################################################
+      # Connexion GHCR
+      #########################################################################
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      #########################################################################
+      # Construction API
+      #########################################################################
+
+      - name: Build API image
+        run: |
+          docker build \
+          -t ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_API }}:latest \
+          -f app/api/Dockerfile \
+          app/api
+
+      #########################################################################
+      # Construction Streamlit
+      #########################################################################
+
+      - name: Build UI image
+        run: |
+          docker build \
+          -t ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_UI }}:latest \
+          -f app/ui/Dockerfile \
+          app/ui
+
+      #########################################################################
+      # Push API
+      #########################################################################
+
+      - name: Push API image
+        run: |
+          docker push \
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_API }}:latest
+
+      #########################################################################
+      # Push UI
+      #########################################################################
+
+      - name: Push UI image
+        run: |
+          docker push \
+          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_UI }}:latest
+
+###############################################################################
+# JOB 3 : Déploiement
+###############################################################################
+
+  deploy:
+
+    name: Deploy production
+
+    runs-on: ubuntu-latest
+
+    needs:
+      - docker
+
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+
+      #########################################################################
+      # Déploiement SSH vers le serveur Docker
+      #########################################################################
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+
+          script: |
+
+            cd /opt/cisia
+
+            docker compose pull
+
+            docker compose up -d
+
+            docker image prune -f
