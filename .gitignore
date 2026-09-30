@@ -1,12 +1,14 @@
 # Données (volumineuses / sous licence — ne pas committer)
-data/*.csv
+# data/*.csv
 !data/README.md
 
 # Sorties générées
 outputs/*
 !outputs/.gitkeep
+logs/
 *.db
 *.jsonl
+
 
 # Python
 __pycache__/
@@ -14,6 +16,8 @@ __pycache__/
 .venv/
 venv/
 env/
+.env
+
 
 # Jupyter
 .ipynb_checkpoints/
@@ -25,7 +29,5 @@ env/
 
 # MLFlow
 app/mlflow/
-logs/
 
-.env
 
