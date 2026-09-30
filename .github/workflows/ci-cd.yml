@@ -102,7 +102,7 @@ jobs:
 
       - name: Verify trained model exists
         run: |
-          test -f outputs/employment_risk_model.pkl
+          test -f app/api/models/employment_risk_model.pkl
 
       #########################################################################
       # Vérification du dataset
