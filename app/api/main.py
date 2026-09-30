@@ -70,11 +70,14 @@ from sklearn.model_selection import train_test_split
 # ==============================================================================
 
 # BASE_DIR = Path(__file__).resolve().parent
-ROOT_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(ROOT_DIR / ".env")
+# ROOT_DIR = Path(__file__).resolve().parents[2]
+# load_dotenv(ROOT_DIR / ".env")
+
+load_dotenv()
+
+ROOT_DIR = Path(__file__).resolve().parent
 
 MODEL_BACKEND = os.getenv("MODEL_BACKEND", "pkl")
-# MODEL_PATH = os.getenv("MODEL_PATH")
 
 MODEL_PATH = Path(
     os.getenv(
@@ -97,7 +100,7 @@ TARGET_COLUMN = os.getenv(
 
 MLFLOW_TRACKING_URI = os.getenv(
     "MLFLOW_TRACKING_URI",
-    "http://host.docker.internal:5000",
+    "http://mlflow:5000",
 )
 
 MLFLOW_EXPERIMENT_NAME = os.getenv(
@@ -107,7 +110,7 @@ MLFLOW_EXPERIMENT_NAME = os.getenv(
 
 MODEL_NAME = os.getenv(
     "MODEL_NAME",
-    "employment_class_model",
+    "employment_risk_model",
 )
 
 MODEL_ALIAS = os.getenv(
@@ -152,14 +155,15 @@ model_lock = threading.RLock()
 
 print(f"✅ Root : {ROOT_DIR}")
 print(f"✅ Back-end : {MODEL_BACKEND}")
-print(f"✅ Model Path : {MODEL_PATH}")
-# print(f"✅ Root : {ROOT_DIR}")
-# print(f"✅ Root : {ROOT_DIR}")
-# print(f"✅ Root : {ROOT_DIR}")
 
-# ==============================================================================
-# JOURNALISATION
-# ==============================================================================
+if MODEL_BACKEND.upper() == "PKL":
+    print(f"✅ Model Path : {MODEL_PATH}")
+
+elif MODEL_BACKEND.upper() == "MLFLOW":
+    print(f"✅ MLflow Tracking URI : {MLFLOW_TRACKING_URI}")
+    print(f"✅ MLflow Experiment : {MLFLOW_EXPERIMENT_NAME}")
+    print(f"✅ Model Name : {MODEL_NAME}")
+    print(f"✅ Model Alias : {MODEL_ALIAS}")
 
 
 # ==============================================================================
@@ -343,6 +347,7 @@ def load_model() -> None:
         active_model_version = artifact.get("version")
 
         logger.info("Modèle PKL chargé avec succès")
+        print(features)
         return
 
     logger.info("Chargement du modèle depuis MLflow")
@@ -360,14 +365,31 @@ def load_model() -> None:
     active_model_version = str(model_version.version)
 
     # Les features doivent idéalement être incluses dans la signature MLflow.
-    features = None
+    preprocessor = model.named_steps["prep"]
 
+    features = {}
+
+    for name, transformer, columns in preprocessor.transformers_:
+
+        if name == "num":
+            features["num_features"] = list(columns)
+        elif name == "cat":
+            features["cat_features"] = list(columns)
+        elif name == "txt":
+            if isinstance(columns, str):
+                features["txt_features"] = columns
+            else:
+                features["txt_features"] = columns[0]
+    
+    print(features)
+    
     logger.info(
         "Modèle MLflow chargé : %s version %s",
         MODEL_NAME,
         active_model_version,
     )
 
+    
 
 load_model()
 
@@ -379,17 +401,26 @@ def build_model_input(data, features):
 
     payload = data.model_dump()
 
-    payload["departement"] = (payload["code_insee_commune"][:2])
+    payload["departement"] = (
+        payload["code_insee_commune"][:2]
+    )
 
     all_features = []
-    all_features.extend(features.get("num_features", []))
-    all_features.extend(features.get("cat_features", []))
-    txt = features.get("txt_features")
 
-    if isinstance(txt, str):
-        all_features.append(txt)
+    for feature_list in features.values():
 
-    return pd.DataFrame([{f: payload.get(f) for f in all_features}])
+        if isinstance(feature_list, list):
+            all_features.extend(feature_list)
+
+        elif isinstance(feature_list, str):
+            all_features.append(feature_list)
+
+    row = {
+        feature: payload.get(feature)
+        for feature in all_features
+    }
+
+    return pd.DataFrame([row])
 
 # ==============================================================================
 # FONCTIONS UTILITAIRES
@@ -916,6 +947,7 @@ def predict(data: UserData) -> dict[str, Any]:
     request_id = str(uuid4())
 
     # Construction du DataFrame attendu par le modèle
+    print("FEATURES =", features)
     input_df = build_model_input(data,features)
 
     print(input_df)
