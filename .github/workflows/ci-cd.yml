@@ -143,6 +143,14 @@ jobs:
         uses: actions/checkout@v4
 
       #########################################################################
+      # Conversion du owner GitHub en minuscules
+      #########################################################################
+
+      - name: Convert owner to lowercase
+        run: |
+          echo "OWNER_LC=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      #########################################################################
       # Connexion GHCR
       #########################################################################
 
@@ -160,9 +168,9 @@ jobs:
       - name: Build API image
         run: |
           docker build \
-          -t ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_API }}:latest \
-          -f app/api/Dockerfile \
-          app/api
+            -t $REGISTRY/$OWNER_LC/$IMAGE_API:latest \
+            -f app/api/Dockerfile \
+            app/api
 
       #########################################################################
       # Construction Streamlit
@@ -171,7 +179,7 @@ jobs:
       - name: Build UI image
         run: |
           docker build \
-          -t ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_UI }}:latest \
+          -t $REGISTRY/$OWNER_LC/$IMAGE_UI:latest \
           -f app/ui/Dockerfile \
           app/ui
 
@@ -182,7 +190,7 @@ jobs:
       - name: Push API image
         run: |
           docker push \
-          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_API }}:latest
+          $REGISTRY/$OWNER_LC/$IMAGE_API:latest
 
       #########################################################################
       # Push UI
@@ -191,7 +199,7 @@ jobs:
       - name: Push UI image
         run: |
           docker push \
-          ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_UI }}:latest
+          $REGISTRY/$OWNER_LC/$IMAGE_UI:latest
 
 ###############################################################################
 # JOB 3 : Déploiement
