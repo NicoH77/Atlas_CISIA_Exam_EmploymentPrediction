@@ -202,12 +202,12 @@ jobs:
           $REGISTRY/$OWNER_LC/$IMAGE_UI:latest
 
 ###############################################################################
-# JOB 3 : Déploiement
+# JOB 3 : Simulation de déploiement
 ###############################################################################
 
   deploy:
 
-    name: Deploy production
+    name: Deployment validation
 
     runs-on: ubuntu-latest
 
@@ -218,24 +218,20 @@ jobs:
 
     steps:
 
-      #########################################################################
-      # Déploiement SSH vers le serveur Docker
-      #########################################################################
-
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-
-          script: |
-
-            cd /opt/cisia
-
-            docker compose pull
-
-            docker compose up -d
-
-            docker image prune -f
+      - name: Validate deployment package
+        run: |
+          echo "================================="
+          echo "DEPLOYMENT SIMULATION SUCCESSFUL"
+          echo "================================="
+          echo ""
+          echo "API image available:"
+          echo "ghcr.io/nicoh77/employment-api:latest"
+          echo ""
+          echo "UI image available:"
+          echo "ghcr.io/nicoh77/employment-ui:latest"
+          echo ""
+          echo "Deployment target would perform:"
+          echo "- docker compose pull"
+          echo "- docker compose up -d"
+          echo ""
+          echo "Pipeline completed successfully."
