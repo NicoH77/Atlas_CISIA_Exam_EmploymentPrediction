@@ -321,4 +321,24 @@ def promote_version_to_champion(
     return version
 
 
+def save_model(model, mlflow_available):
 
+    if mlflow_available:
+
+        mlflow.sklearn.log_model(
+            model,
+            artifact_path="model"
+        )
+
+    else:
+
+        model_path = ROOT / system_cfg.MODEL_PATH
+
+        joblib.dump(
+            model,
+            model_path
+        )
+
+        print(
+            f"Modèle sauvegardé : {model_path}"
+        )
