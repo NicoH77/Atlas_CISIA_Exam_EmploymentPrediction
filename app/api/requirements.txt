@@ -14,3 +14,6 @@ mlflow
 python-dotenv
 python-multipart
 
+prometheus-client>=0.19,<1.0
+prometheus-fastapi-instrumentator==7.1.0
+starlette
