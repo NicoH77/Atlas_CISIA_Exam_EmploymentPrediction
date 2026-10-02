@@ -341,3 +341,48 @@
 {"timestamp": "2026-09-30T11:56:23", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
 {"timestamp": "2026-09-30T11:56:29", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 2"}
 {"timestamp": "2026-09-30T12:32:55", "level": "INFO", "logger": "employment-risk-api", "message": "prediction_completed", "request_id": "ed902330-ed69-4ab6-8cdb-9d12aa079d07", "session_id": "966c4f37-98b2-4c46-9394-2194caafe803", "inference_date": "2026-09-30T12:32:55.636253+00:00", "input": {"usager_id": "ID_5053", "age": 50.0, "niveau_diplome": "Bac+5", "anciennete_poste_ans": 20.0, "code_rome_vise": "M1805", "code_insee_commune": "75001", "est_allocataire": 1, "nationalite_hors_ue": 0, "synthese_entretien": "Bonne présentation, personne mobile sur Paris uniquement. Besoin d'une mise à jour des compétences."}, "prediction": 0, "probabilities": {"0": 0.4058, "1": 0.3187, "2": 0.2754}, "confidence": 0.4058, "model_version": "2"}
+{"timestamp": "2026-10-02T09:52:44", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T09:52:50", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T12:12:34", "level": "INFO", "logger": "employment-risk-api", "message": "prediction_completed", "request_id": "020a38a0-9f7f-42f9-8dd0-4210f45fec26", "session_id": "862fb2bd-32a6-4be7-bffa-cda777469a42", "inference_date": "2026-10-02T12:12:34.522611+00:00", "input": {"usager_id": "ID_5054", "age": 30.0, "niveau_diplome": "Sans diplome", "anciennete_poste_ans": 5.0, "code_rome_vise": "A1404", "code_insee_commune": "45001", "est_allocataire": 1, "nationalite_hors_ue": 0, "synthese_entretien": "Perte de confiance importante. Personne mobile, dispose d'une voiture."}, "prediction": 0, "probabilities": {"0": 0.4236, "1": 0.3255, "2": 0.2508}, "confidence": 0.4236, "model_version": "5"}
+{"timestamp": "2026-10-02T13:55:21", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T13:55:22", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T13:58:04", "level": "INFO", "logger": "employment-risk-api", "message": "prediction_completed", "request_id": "0a114a27-71ff-4d39-a7a7-829a8d25bb45", "session_id": "a81c2b30-2323-44c8-a2da-77d1eea824aa", "inference_date": "2026-10-02T13:58:04.242804+00:00", "input": {"usager_id": "ID_5055", "age": 45.0, "niveau_diplome": "Bac+5", "anciennete_poste_ans": 15.0, "code_rome_vise": "H1206", "code_insee_commune": "91240", "est_allocataire": 1, "nationalite_hors_ue": 0, "synthese_entretien": "Candidat motivé mais perte de confiance importante. Problème de mobilité ponctuel (pas de voiture)"}, "prediction": 2, "probabilities": {"0": 0.2876, "1": 0.2001, "2": 0.5123}, "confidence": 0.5123, "model_version": "5"}
+{"timestamp": "2026-10-02T14:22:20", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:22:26", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:22:29", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:22:30", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:22:33", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:22:33", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:22:37", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:22:37", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:22:42", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:22:42", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:22:47", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:22:47", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:22:54", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:22:54", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:23:03", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:23:04", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:23:20", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:23:20", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:23:49", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:23:50", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:24:44", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:24:44", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:25:48", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:25:48", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:26:51", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:26:51", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:27:54", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:27:55", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:28:32", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:28:32", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:29:15", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:29:16", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:29:56", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:30:02", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:30:27", "level": "INFO", "logger": "employment-risk-api", "message": "prediction_completed", "request_id": "993c5790-cdb0-4ff5-a994-73939ac8900c", "session_id": "c4c006c8-e7ef-4869-9d46-40646e5a4b47", "inference_date": "2026-10-02T14:30:27.345085+00:00", "input": {"usager_id": "ID_5056", "age": 22.0, "niveau_diplome": "Bac+2", "anciennete_poste_ans": 1.0, "code_rome_vise": "D1502", "code_insee_commune": "78000", "est_allocataire": 1, "nationalite_hors_ue": 0, "synthese_entretien": "Candidat timide, mais présente bien. Mobile."}, "prediction": 0, "probabilities": {"0": 0.6591, "1": 0.2772, "2": 0.0637}, "confidence": 0.6591, "model_version": "5"}
+{"timestamp": "2026-10-02T14:47:36", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:47:42", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
+{"timestamp": "2026-10-02T14:50:53", "level": "INFO", "logger": "employment-risk-api", "message": "Chargement du modèle depuis MLflow"}
+{"timestamp": "2026-10-02T14:50:59", "level": "INFO", "logger": "employment-risk-api", "message": "Modèle MLflow chargé : employment_risk_model version 5"}
