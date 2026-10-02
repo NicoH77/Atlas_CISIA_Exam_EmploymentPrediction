@@ -2,13 +2,63 @@
 ===============================================================================
 Nom du script : app.py
 Auteur : Nico H
-Projet : Orientation et tri multimodal des demandeurs d'emploi 
+Projet : Orientation et tri multimodal des demandeurs d'emploi
 Version : 1.0
 ===============================================================================
 
+Fonctionnalités principales
+---------------------------
+- Initialisation de la base locale SQLite.
+- Saisie des informations d'un usager dans un formulaire Streamlit.
+- Envoi des données à l'API pour prédire le délai potentiel de retour à l'emploi.
+- Affichage de la prédiction et du niveau de confiance
+- Enregistrement de chaque inférence et de ses données dans l'historique.
+- Consultation de l'historique des prédictions.
+- Saisie et mise à jour d'un feedback humain sur la classe constatée.
+- Export des prédictions revues au format CSV pour le réentraînement.
+- Gestion des erreurs liées aux appels API, aux réponses invalides et à SQLite.
 
+Interface
+---------
+Onglet « Nouvelle prédiction »
+    Permet à un conseiller de renseigner les caractéristiques d'un usager,
+    d'interroger l'API et de visualiser le résultat de la prédiction.
+
+Onglet « Historique et feedback »
+    Permet de consulter les inférences enregistrées, de sélectionner une
+    prédiction et de renseigner la classe de retour à l'emploi constatée.
+
+Persistance
+-----------
+Base SQLite
+    Stocke les données d'entrée, la date d'inférence, la classe prédite,
+    la confiance, les probabilités par classe et le feedback humain.
+
+Export CSV
+    Produit un jeu de données compatible avec le contrat de réentraînement,
+    limité par défaut aux prédictions disposant d'un feedback validé.
+
+Configuration
+-------------
+DB_PATH
+    Chemin de la base SQLite. Valeur par défaut :
+    /app/database/history.db
+
+API_URL
+    URL de l'endpoint de prédiction. Valeur par défaut :
+    http://api:8000/predict
+
+MODEL_INFO_URL
+    URL de l'endpoint fournissant les métadonnées du modèle. Valeur par défaut :
+    http://api:8000/model-info
+
+Responsabilité et supervision humaine
+-------------------------------------
+Cette application fournit une aide à la décision. La prédiction du modèle ne
+constitue pas une décision automatisée définitive. La classe constatée est
+renseignée ultérieurement par un utilisateur habilité et la décision finale
+reste sous la responsabilité du conseiller.
 """
-
 
 
 from __future__ import annotations
@@ -23,13 +73,6 @@ import pandas as pd
 import requests
 import streamlit as st
 from dotenv import load_dotenv
-
-
-
-
-# =====================================================
-# CONFIGURATION
-# =====================================================
 
 # =====================================================
 # CONFIGURATION
