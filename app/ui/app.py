@@ -1,11 +1,12 @@
+import os
 import sqlite3
 from datetime import datetime
 from pathlib import Path
+
 import pandas as pd
 import requests
 import streamlit as st
 from dotenv import load_dotenv
-import os
 
 # =====================================================
 # CONFIGURATION

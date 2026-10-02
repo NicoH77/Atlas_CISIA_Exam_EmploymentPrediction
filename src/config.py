@@ -10,9 +10,7 @@ Organisation :
 
 from pathlib import Path
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 # ==========================================================
 # RACINE PROJET

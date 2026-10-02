@@ -39,11 +39,11 @@ import io
 import json
 import logging
 import os
-from dotenv import load_dotenv
 import threading
-from datetime import datetime, timezone
+from contextlib import nullcontext
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 from uuid import uuid4
 
 import joblib
@@ -51,8 +51,8 @@ import mlflow
 import mlflow.sklearn
 import numpy as np
 import pandas as pd
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from mlflow.models import infer_signature
 from mlflow.tracking import MlflowClient
 from pydantic import BaseModel, Field
 from sklearn.base import clone
@@ -63,7 +63,6 @@ from sklearn.metrics import (
     recall_score,
 )
 from sklearn.model_selection import train_test_split
-
 
 # ==============================================================================
 # CONFIGURATION
@@ -81,7 +80,7 @@ MODEL_BACKEND = os.getenv("MODEL_BACKEND", "pkl")
 
 MODEL_PATH = Path(
     os.getenv(
-        str("MODEL_PATH"),
+        "MODEL_PATH",
         str(ROOT_DIR / "models" / "employment_risk_model.pkl"),
     )
 )
@@ -369,7 +368,7 @@ def load_model() -> None:
 
     features = {}
 
-    for name, transformer, columns in preprocessor.transformers_:
+    for name, _transformer, columns in preprocessor.transformers_:
 
         if name == "num":
             features["num_features"] = list(columns)
@@ -429,7 +428,7 @@ def build_model_input(data, features):
 def utc_now_iso() -> str:
     """Retourne la date UTC au format ISO 8601."""
 
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 
@@ -980,6 +979,7 @@ def predict(data: UserData) -> dict[str, Any]:
                     for class_label, probability in zip(
                         model_classes,
                         probabilities_array,
+                        strict=True,
                     )
                 }
 
@@ -1031,7 +1031,7 @@ def predict(data: UserData) -> dict[str, Any]:
     response_model=RetrainingResponse,
 )
 async def retrain(
-    feedback_file: UploadFile = File(...),
+    feedback_file: Annotated[UploadFile, File(...)],
     promote_if_valid: bool = False,
 ) -> RetrainingResponse:
     """
@@ -1066,7 +1066,6 @@ async def retrain(
 
     run_id: str | None = None
     model_version: str | None = None
-    candidate_path: Path | None = None
 
     try:
         # ----------------------------------------------------------
@@ -1129,13 +1128,13 @@ async def retrain(
             dataframe
         )
 
-        X = dataframe[expected_features].copy()
+        x = dataframe[expected_features].copy()
         y = dataframe[TARGET_COLUMN].copy()
 
         print(
             f"✅ Dataset modèle préparé : "
-            f"{X.shape[0]} lignes, "
-            f"{X.shape[1]} features"
+            f"{x.shape[0]} lignes, "
+            f"{x.shape[1]} features"
         )
         print(f"✅ Features utilisées : {expected_features}")
         print(
@@ -1148,8 +1147,8 @@ async def retrain(
             extra={
                 "extra_data": {
                     "retraining_id": retraining_id,
-                    "row_count": len(X),
-                    "feature_count": X.shape[1],
+                    "row_count": len(x),
+                    "feature_count": x.shape[1],
                     "features": expected_features,
                     "class_distribution": (
                         y.value_counts()
@@ -1165,12 +1164,12 @@ async def retrain(
         # ----------------------------------------------------------
         try:
             (
-                X_train,
-                X_validation,
+                x_train,
+                x_validation,
                 y_train,
                 y_validation,
             ) = train_test_split(
-                X,
+                x,
                 y,
                 test_size=VALIDATION_SIZE,
                 random_state=RANDOM_STATE,
@@ -1188,11 +1187,11 @@ async def retrain(
 
         print(
             f"✅ Split effectué : "
-            f"total={len(X)} | "
-            f"train={len(X_train)} "
-            f"({len(X_train) / len(X):.1%}) | "
-            f"validation={len(X_validation)} "
-            f"({len(X_validation) / len(X):.1%})"
+            f"total={len(x)} | "
+            f"train={len(x_train)} "
+            f"({len(x_train) / len(x):.1%}) | "
+            f"validation={len(x_validation)} "
+            f"({len(x_validation) / len(x):.1%})"
         )
 
         print(
@@ -1209,8 +1208,8 @@ async def retrain(
             extra={
                 "extra_data": {
                     "retraining_id": retraining_id,
-                    "train_row_count": len(X_train),
-                    "validation_row_count": len(X_validation),
+                    "train_row_count": len(x_train),
+                    "validation_row_count": len(x_validation),
                     "validation_size": VALIDATION_SIZE,
                     "random_state": RANDOM_STATE,
                     "train_class_distribution": (
@@ -1234,7 +1233,7 @@ async def retrain(
         try:
             with model_lock:
                 baseline_predictions = model.predict(
-                    X_validation
+                    x_validation
                 )
         except Exception as exc:
             raise HTTPException(
@@ -1316,8 +1315,8 @@ async def retrain(
                     {
                         "input_row_count": len(dataframe),
                         "feature_count": len(expected_features),
-                        "train_row_count": len(X_train),
-                        "validation_row_count": len(X_validation),
+                        "train_row_count": len(x_train),
+                        "validation_row_count": len(x_validation),
                         "validation_size": VALIDATION_SIZE,
                         "random_state": RANDOM_STATE,
                         "target_column": TARGET_COLUMN,
@@ -1402,7 +1401,7 @@ async def retrain(
 
             try:
                 candidate_model.fit(
-                    X_train,
+                    x_train,
                     y_train,
                 )
             except Exception as exc:
@@ -1422,7 +1421,7 @@ async def retrain(
             # ----------------------------------------------------------
             try:
                 candidate_predictions = candidate_model.predict(
-                    X_validation
+                    x_validation
                 )
             except Exception as exc:
                 if active_run is not None:
@@ -1543,8 +1542,8 @@ async def retrain(
             promoted=promoted,
             rejection_reasons=rejection_reasons,
             row_count=len(dataframe),
-            train_row_count=len(X_train),
-            validation_row_count=len(X_validation),
+            train_row_count=len(x_train),
+            validation_row_count=len(x_validation),
             baseline_metrics=baseline_metrics,
             candidate_metrics=candidate_metrics,
             model_backend="mlflow",

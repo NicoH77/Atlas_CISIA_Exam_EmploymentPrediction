@@ -1,10 +1,9 @@
 import pandas as pd
-
-from sklearn.pipeline import Pipeline
 from sklearn.model_selection import cross_validate
+from sklearn.pipeline import Pipeline
 
 
-def evaluate_model_cv(model, preprocessor, X, y, cv, scoring):
+def evaluate_model_cv(model, preprocessor, x, y, cv, scoring):
     """
     Exécute une validation croisée sur un pipeline complet.
 
@@ -12,7 +11,7 @@ def evaluate_model_cv(model, preprocessor, X, y, cv, scoring):
     ----------
     model        : Estimateur sklearn
     preprocessor :  Transformer sklearn
-    X            : Features
+    x            : Features
     y            : Cible
     cv           : Objet de validation croisée
     scoring      : Dictionnaire de métriques
@@ -24,7 +23,7 @@ def evaluate_model_cv(model, preprocessor, X, y, cv, scoring):
 
     pipeline = Pipeline([("prep", preprocessor),("clf", model)])
 
-    scores = cross_validate(estimator=pipeline, X=X, y=y, cv=cv, scoring=scoring, n_jobs=-1)
+    scores = cross_validate(estimator=pipeline, x=x, y=y, cv=cv, scoring=scoring, n_jobs=-1)
 
     return {
             "f1_macro": round(scores["test_f1_macro"].mean(), 3),
@@ -39,7 +38,7 @@ def evaluate_model_cv(model, preprocessor, X, y, cv, scoring):
     }
 
 
-def run_benchmark(models, scenarios, X_train, y_train, cv, scoring, build_preprocessor):
+def run_benchmark(models, scenarios, x_train, y_train, cv, scoring, build_preprocessor):
     """
     Benchmark de plusieurs modèles sur plusieurs scénarios.
     """
@@ -55,7 +54,7 @@ def run_benchmark(models, scenarios, X_train, y_train, cv, scoring, build_prepro
             metrics = evaluate_model_cv(
                 model=model,
                 preprocessor=preprocessor,
-                X=X_train,
+                x=x_train,
                 y=y_train,
                 cv=cv,
                 scoring=scoring

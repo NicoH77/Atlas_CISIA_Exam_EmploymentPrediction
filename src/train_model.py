@@ -28,41 +28,42 @@ Après exécution, consultez http://localhost:5000 pour voir :
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+import joblib
+import matplotlib.pyplot as plt
 import mlflow
 import mlflow.sklearn
 from mlflow.tracking import MlflowClient
-from mlflow.models import infer_signature
-from sklearn.model_selection import train_test_split, StratifiedKFold
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestClassifier
-
-import pandas as pd
-import matplotlib.pyplot as plt
-
-
-
 from sklearn.metrics import (
-    accuracy_score,
+    ConfusionMatrixDisplay,
     balanced_accuracy_score,
+    classification_report,
     f1_score,
     recall_score,
-    classification_report,
-    confusion_matrix,
-    ConfusionMatrixDisplay
 )
-
 from sklearn.pipeline import Pipeline
 
-from mlflow.models import infer_signature
+from .config import (
+    system_cfg,
+)
 
+ROOT = (
+    Path.cwd().parent
+    if Path.cwd().name == "src"
+    else Path.cwd()
+)
+
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 # ------------------------------------------------------------------
 # Configuration
 # ------------------------------------------------------------------
 
 
-def train_model(model, preprocessor, X_train, X_test, y_train, y_test, model_name="employment_risk_model", alias="candidate"):
+def train_model(model, preprocessor, x_train, x_test, y_train, y_test, model_name="employment_risk_model", alias="candidate"):
     """
     Entraîne le GridSearchCV et log les résultats dans MLflow.
     
@@ -77,8 +78,8 @@ def train_model(model, preprocessor, X_train, X_test, y_train, y_test, model_nam
     Args:
         search (GridSearchCV): Objet de recherche d'hyperparamètres configuré avec le pipeline
             de prétraitement et de modélisation.
-        X_train (pd.DataFrame): Variables du jeu d'entraînement
-        X_test (pd.DataFrame): Variables du jeu de test.
+        x_train (pd.DataFrame): Variables du jeu d'entraînement
+        x_test (pd.DataFrame): Variables du jeu de test.
         y_train (pd.Series): Variable cible du jeu d'entraînement.
         y_test (pd.Series): Variable cible du jeu d'évaluation.
         model_name (str, optional): Nom du modèle dans le MLflow Model Registry.
@@ -102,9 +103,9 @@ def train_model(model, preprocessor, X_train, X_test, y_train, y_test, model_nam
     
     with mlflow.start_run(run_name=f"{scenario}_{model_name}"):
 
-        # ====================================================================
+        # --------------------------------------------------------------------
         # ÉTAPE 1 : ENTRAÎNEMENT ET TEST DU MODÈLE
-        # ====================================================================
+        # --------------------------------------------------------------------
         # fit() entraîne le modèle sur les données d'entrainement
         # Après cette étape, le modèle peut faire des prédictions
         
@@ -112,28 +113,21 @@ def train_model(model, preprocessor, X_train, X_test, y_train, y_test, model_nam
 
         pipeline = Pipeline([("prep", preprocessor),("clf", model)])
         
-        pipeline.fit(X_train, y_train)
+        pipeline.fit(x_train, y_train)
 
         
         # Prédictions
-        y_pred = pipeline.predict(X_test)
-        y_proba = pipeline.predict_proba(X_test)[:, 1]
+        y_pred = pipeline.predict(x_test)
 
-        # ====================================================================
+        # --------------------------------------------------------------------
         # ÉTAPE 2 : CALCUL DES MÉTRIQUES
-        # ====================================================================
+        # --------------------------------------------------------------------
         # Les métriques quantifient la performance du modèle
         # 
         # accuracy  : % de prédictions correctes
-        # precision : parmi les positifs prédits, combien sont vrais positifs
         # recall    : parmi les vrais positifs, combien sont détectés
         # f1_score  : moyenne harmonique de precision et recall
-        
-        # Capture des métriques d'évaluation        
-        # accuracy = accuracy_score(y_test, y_pred)
-        # recall = recall_score(y_test, y_pred)
-        # f1 = f1_score(y_test, y_pred)
-        # auc = roc_auc_score(y_test, y_proba)
+        # recall_classe 2 : 
 
         metriques = {
            "balanced_accuracy": balanced_accuracy_score(y_test, y_pred),
@@ -142,10 +136,9 @@ def train_model(model, preprocessor, X_train, X_test, y_train, y_test, model_nam
            "recall_classe_2": recall_score(y_test, y_pred, labels=[2], average=None)[0]
         }
         
-        # ====================================================================
+        # --------------------------------------------------------------------
         # ÉTAPE 3 : LOG MLFLOW
-        # ====================================================================
-
+        # --------------------------------------------------------------------
         # Log des paramètres
         mlflow.log_params(pipeline.get_params())
         mlflow.log_param("model_type", type(model).__name__)
@@ -157,14 +150,11 @@ def train_model(model, preprocessor, X_train, X_test, y_train, y_test, model_nam
         mlflow.log_metric("recall_classe_2", metriques['recall_classe_2'])
         
 
-        # =====================================================
+        # --------------------------------------------------------------------
         # ÉTAPE 4 : CLASSIFICATION REPORT
-        # =====================================================
-        # Capture et log du rapport de classification
-        report = classification_report(
-            y_test,
-            y_pred
-        )
+        # --------------------------------------------------------------------
+        
+        report = classification_report(y_test, y_pred)
 
         with open(
             "classification_report.txt",
@@ -176,13 +166,13 @@ def train_model(model, preprocessor, X_train, X_test, y_train, y_test, model_nam
         mlflow.log_artifact("classification_report.txt")
 
         
-        # ====================================================================
+        # --------------------------------------------------------------------
         # ÉTAPE 5 : MATRICE DE CONFUSION NORMALISÉE
-        # ====================================================================
+        # --------------------------------------------------------------------
 
         fig, ax = plt.subplots(figsize=(6, 5))
 
-        disp = ConfusionMatrixDisplay.from_predictions(
+        ConfusionMatrixDisplay.from_predictions(
             y_test,
             y_pred,
             normalize="true",  # normalisation par ligne
@@ -200,9 +190,9 @@ def train_model(model, preprocessor, X_train, X_test, y_train, y_test, model_nam
 
         plt.close(fig)      
 
-        # =====================================================
+        # --------------------------------------------------------------------
         # ÉTAPE 6 : TAGS
-        # =====================================================
+        # --------------------------------------------------------------------
 
         mlflow.set_tags(
             {
@@ -213,20 +203,21 @@ def train_model(model, preprocessor, X_train, X_test, y_train, y_test, model_nam
             }
         )
         
-        # =========================
+        # --------------------------------------------------------------------
         # ÉTAPE 7 : Enregistrement du modèle
-        # =========================
+        # --------------------------------------------------------------------
 
         model_info = mlflow.sklearn.log_model(
             sk_model=pipeline,
-            name="model",
+            name=model_name,
             serialization_format="pickle"
         )
 
         
-        # ====================================================================
+        # --------------------------------------------------------------------
         # ÉTAPE 8 : AFFICHAGE DES RÉSULTATS
-        # ====================================================================
+        # --------------------------------------------------------------------
+        
         print(f"✅ Modèle {model_name} entraîné et logué avec succès dans MLflow.")
         print(f"   - Balanced-accuracy: {metriques['balanced_accuracy']:.4f}")
         print(f"   - Recall-macro: {metriques['recall_macro']:.4f}")
@@ -234,9 +225,9 @@ def train_model(model, preprocessor, X_train, X_test, y_train, y_test, model_nam
         print(f"   - Recall-classe-2: {metriques['recall_classe_2']:.4f}")        
         
 
-        # =========================
+        # --------------------------------------------------------------------
         # Registry
-        # =========================
+        # --------------------------------------------------------------------
 
         client = MlflowClient()
 
@@ -249,24 +240,16 @@ def train_model(model, preprocessor, X_train, X_test, y_train, y_test, model_nam
             version=model_version.version
         )
 
-        
-
-        print("Run ID :", mlflow.active_run().info.run_id)
-        print("Model version :", model_version.version)
-        print("F1-Macro :", round(metriques['f1_macro'], 4))
+        print("⭐ Run ID :", mlflow.active_run().info.run_id)
+        print("   - Model version :", model_version.version)
+        print("   - Alias :", alias)
 
         return pipeline
+		
 
 
 
-from mlflow import MlflowClient
-
-
-
-def promote_version_to_champion(
-    model_name: str,
-    version: int | None = None
-) -> int:
+def promote_version_to_champion(model_name: str, version: int | None = None) -> int:
     """
     Promeut une version en champion.
 
@@ -319,6 +302,7 @@ def promote_version_to_champion(
     )
 
     return version
+
 
 
 def save_model(model, mlflow_available):

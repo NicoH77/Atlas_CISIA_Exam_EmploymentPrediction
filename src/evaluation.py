@@ -1,24 +1,22 @@
-from sklearn.pipeline import Pipeline
-
 from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score,
-    recall_score,
     f1_score,
-    classification_report
+    recall_score,
 )
+from sklearn.pipeline import Pipeline
 
 
-def evaluate_test_set(model, preprocessor, X_train, y_train, X_test, y_test):
+def evaluate_test_set(model, preprocessor, x_train, y_train, x_test, y_test):
     """
     Evaluation finale sur test set.
     """
 
     pipeline = Pipeline([("prep", preprocessor),("clf", model)])
 
-    pipeline.fit(X_train, y_train)
+    pipeline.fit(x_train, y_train)
 
-    y_pred = pipeline.predict(X_test)
+    y_pred = pipeline.predict(x_test)
 
     metrics = {
         "accuracy":
