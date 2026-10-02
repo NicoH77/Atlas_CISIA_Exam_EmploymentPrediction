@@ -1,0 +1,45 @@
+# Configuration des outils qualité (linting + formatage).
+# Utilisation :
+#   ruff check src/         # linter
+#   ruff check src/ --fix   # corrections auto
+#   black src/              # formatage
+# Voir docs/GITHUB.md, section « Linting et formatage ».
+
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+# Dossiers/formats ignorés par le linter.
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "mlflow",
+    "data",
+    "notebooks",
+    "outputs",
+    "docs"
+]
+
+# E,F = erreurs pycodestyle/pyflakes ; I = tri des imports ; 
+# N = convention de nomage ; UP = modernisations; B = BugBear.
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "N",
+    "UP",
+    "B"
+]
+
+ignore = [
+    "E501"
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+extend-exclude = "notebooks|data|outputs|mlflow|docs"
+
