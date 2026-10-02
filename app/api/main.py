@@ -64,6 +64,10 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import train_test_split
 
+from contextlib import asynccontextmanager
+from prometheus_fastapi_instrumentator import Instrumentator
+
+
 # ==============================================================================
 # CONFIGURATION
 # ==============================================================================
@@ -216,6 +220,20 @@ logger.addHandler(console_handler)
 
 
 # ==============================================================================
+# INSTRUMENTATOR
+# ==============================================================================
+instrumentator = None # Define globally or manage scope appropriately
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+
+    logging.info("Startup complete.")
+    yield
+    logging.info("Shutdown complete.")
+
+
+
+# ==============================================================================
 # APPLICATION FASTAPI
 # ==============================================================================
 
@@ -226,8 +244,11 @@ app = FastAPI(
         "La prédiction ne remplace pas la décision du conseiller."
     ),
     version="1.1",
+    lifespan=lifespan,
 )
 
+# Prometheus
+Instrumentator().instrument(app).expose(app)
 
 # ------------------------------------------------------------------
 # Schéma des données d'entrée (pydantic)
