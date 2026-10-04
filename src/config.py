@@ -31,7 +31,7 @@ class SystemConfig(BaseSettings):
     PROJECT_NAME: str = "Atlas CISIA"
     ENVIRONMENT: str = "dev"
 
-    NO_PROXY: str = "localhost,127.0.0.1"
+    DISABLE_PROXY: bool = True
 
     # ------------------------------------------------------
     # Dataset
@@ -112,10 +112,13 @@ class ProjectConfig:
         "niveau_diplome",
         "code_rome_vise",
         "departement",
+    ]
+
+    FEATURES_BINARY = [
         "est_allocataire",
         "nationalite_hors_ue",
     ]
-
+    
     FEATURES_SENSITIVE = [
         "age",
         "nationalite_hors_ue",
