@@ -23,7 +23,7 @@ def evaluate_model_cv(model, preprocessor, x, y, cv, scoring):
 
     pipeline = Pipeline([("prep", preprocessor),("clf", model)])
 
-    scores = cross_validate(estimator=pipeline, x=x, y=y, cv=cv, scoring=scoring, n_jobs=-1)
+    scores = cross_validate(estimator=pipeline, X=x, y=y, cv=cv, scoring=scoring, n_jobs=-1)
 
     return {
             "f1_macro": round(scores["test_f1_macro"].mean(), 3),
