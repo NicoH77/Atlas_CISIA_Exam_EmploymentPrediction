@@ -109,6 +109,55 @@ st.set_page_config(
     layout="wide",
 )
 
+
+st.markdown("""
+<style>
+
+.block-container {
+    padding-top: 0.8rem;
+    padding-bottom: 0rem;
+    max-width: 1400px;
+}
+
+div[data-testid="stVerticalBlock"] {
+    gap: 0.4rem;
+}
+
+header[data-testid="stHeader"]{
+    visibility:hidden;
+}
+
+.stTabs [data-baseweb="tab-list"] {
+    gap: 20px;
+}
+
+.stTabs [data-baseweb="tab"] {
+    font-size: 16px;
+}
+
+div[data-testid="stSidebar"] {
+    width: 260px;
+}
+
+.blue-card {
+    padding: 12px;
+    border-left: 5px solid #0063CB;
+    background-color: #F5F9FF;
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
 # =====================================================
 # BASE SQLITE
 # =====================================================
@@ -302,11 +351,17 @@ create_database()
 # =====================================================
 # EN-TETE ET INFORMATIONS MODELE
 # =====================================================
-st.title("📊 Prédiction de retour à l'emploi")
-st.markdown(
-    "Cette application fournit une aide a la decision. "
-    "La classe constatee est saisie ulterieurement par un utilisateur habilite."
-)
+st.markdown("""
+<div class="blue-card">
+<h2 style="margin-bottom:2px;">
+📊 Prédiction de retour à l'emploi
+</h2>
+
+<p style="margin-bottom:0px;color:#666;">
+Aide à la décision • Validation humaine obligatoire
+</p>
+</div>
+""", unsafe_allow_html=True)
 
 try:
     model_response = requests.get(MODEL_INFO_URL, timeout=5)
@@ -331,34 +386,108 @@ tab_prediction, tab_history = st.tabs(
 # ONGLET PREDICTION
 # =====================================================
 with tab_prediction:
+
     with st.form("prediction_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            usager_id = st.text_input("Identifiant usager")
-            age = st.number_input("Age", min_value=16, max_value=70, value=30)
-            niveau_diplome = st.selectbox(
-                "Niveau de diplome",
-                ["Sans diplome", "Bac", "Bac+2", "Bac+5"],
-            )
-            anciennete_poste_ans = st.number_input(
-                "Anciennete du dernier poste",
-                min_value=0.0,
-                max_value=50.0,
-                value=0.0,
-                step=0.5,
+
+        st.markdown(
+            '<div class="section-title">👤 Informations usager</div>',
+            unsafe_allow_html=True,
+        )
+
+        c1, c2, c3, c4 = st.columns(4)
+
+        with c1:
+            usager_id = st.text_input(
+                "Identifiant",
+                placeholder="ID_0001"
             )
 
-        with col2:
-            code_rome_vise = st.text_input("Code ROME vise")
-            code_insee_commune = st.text_input("Code INSEE commune")
-            est_allocataire = st.selectbox("Allocataire", [0, 1])
-            nationalite_hors_ue = st.selectbox("Nationalite hors UE", [0, 1])
+        with c2:
+            age = st.number_input(
+                "Âge",
+                min_value=16,
+                max_value=70,
+                value=30
+            )
+
+        with c3:
+            code_insee_commune = st.text_input(
+                "Commune",
+                placeholder="75000"
+            )
+
+
+        with c4:
+            nationalite_hors_ue_txt = st.selectbox(
+                "Nationalité hors UE",
+                ["Non", "Oui"]
+            )
+
+
+        st.markdown(
+            '<div class="section-title">💼 Situation professionnelle</div>',
+            unsafe_allow_html=True,
+        )
+
+        c1, c2, c3, c4 = st.columns(4)
+
+        with c1:
+            code_rome_vise = st.text_input(
+                "Code ROME",
+                placeholder="M1805"
+            )
+
+        with c2:
+            niveau_diplome = st.selectbox(
+                "Diplôme",
+                [
+                    "Sans diplôme",
+                    "Bac",
+                    "Bac+2",
+                    "Bac+5",
+                ]
+            )
+
+        with c3:
+            anciennete_poste_ans = st.number_input(
+                "Ancienneté (ans)",
+                min_value=0.0,
+                value=0.0,
+                step=0.5
+            )
+
+        with c4:
+            est_allocataire_txt = st.selectbox(
+                "Allocataire",
+                ["Non", "Oui"]
+            )
+
+        st.markdown(
+            '<div class="section-title">📝 Synthèse entretien</div>',
+            unsafe_allow_html=True,
+        )
 
         synthese_entretien = st.text_area(
-            "Synthese de l'entretien",
-            height=200,
+            "",
+            height=100,
+            placeholder="""
+Projet professionnel...
+Freins identifiés...
+Mobilité...
+Compétences clés...
+"""
         )
-        submitted = st.form_submit_button("🔍 Lancer la prediction")
+
+        col_left, col_center, col_right = st.columns([3,2,3])
+
+        with col_center:
+            submitted = st.form_submit_button(
+                "🔍 Lancer la prédiction",
+                use_container_width=True
+            )
+
+    est_allocataire = 1 if est_allocataire_txt == "Oui" else 0
+    nationalite_hors_ue = 1 if nationalite_hors_ue_txt == "Oui" else 0
 
     if submitted:
         if not usager_id.strip():
